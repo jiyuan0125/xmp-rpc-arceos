@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
     io::{Read, Write},
-    net::{SocketAddr, TcpListener, UdpSocket},
+    net::{SocketAddr, TcpListener},
     sync::{Arc, RwLock},
 };
 
-use log::{debug, error};
+use log::{debug, error, info};
 
 use crate::{header, XmlRpcResult};
 
@@ -18,7 +18,6 @@ pub type Handlers = Arc<RwLock<HashMap<String, Handler>>>;
 
 pub struct Server {
     tcp_listener: Option<TcpListener>,
-    _udp_socket: Option<UdpSocket>,
     config: ServerConfig,
     handlers: Handlers,
 }
@@ -26,11 +25,8 @@ pub struct Server {
 impl Server {
     pub fn bind(socket_addr: SocketAddr) -> XmlRpcResult<Server> {
         let tcp_listener = TcpListener::bind(socket_addr)?;
-        let udp_socket = UdpSocket::bind(socket_addr)?;
-
         Ok(Server {
             tcp_listener: Some(tcp_listener),
-            _udp_socket: Some(udp_socket),
             config: ServerConfig { socket_addr },
             handlers: Default::default(),
         })
@@ -38,6 +34,7 @@ impl Server {
 
     pub fn run(&mut self) {
         let tcp_listener = self.tcp_listener.take().unwrap();
+        info!("listening: {}", self.config.socket_addr);
         accept_loop_tcp(tcp_listener, self.handlers.clone());
     }
 
@@ -75,8 +72,6 @@ fn accept_loop_tcp(tcp_listener: TcpListener, hanlders: Handlers) {
 
     join_handle.join().unwrap();
 }
-
-fn _accept_loop_udp(_udp_socket: UdpSocket) {}
 
 fn dispatch_request(request: &str, hanlders: Handlers) -> String {
     match hanlders.read().unwrap().get("/") {
